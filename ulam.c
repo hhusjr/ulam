@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <getopt.h>
 
 #define C_LAMBDA '\\'
 
@@ -100,18 +101,103 @@ char* new_var_name(const char* name, size_t len, size_t* new_len);
 bool eval_single_step(struct ast_node* m);
 void eval(struct ast_node* m);
 
-int main() {
-    const char* code = "(((\\f.\\g.\\x.((f x)  (g x))  \\m.\\n.(n m))  \\n.z)p)";
-    load_src(code, strlen(code));
-    struct ast_node* node = e();
-    eval(node);
-    dump_ast(node);
-    return 0;
+#define CODE_BUFFER_SIZE 1024
+char code[CODE_BUFFER_SIZE];
+size_t code_len = 0, store_len = 0;
+char* store;
+
+struct symbol {
+    const char* name;
+    size_t len;
+    struct ast_node* node;
+
+    struct symbol* next;
+};
+struct symbol* symbol_head = NULL;
+
+int main(int argc, char** argv) {
+    const char* path = NULL;
+    int result;
+    while ((result = getopt(argc, argv, "o:")) != -1) {
+        switch (result) {
+            case 'o':
+                path = strdup(optarg);
+                break;
+
+            default:
+                printf("Usage: ./lambda [-o source_code_path]\n");
+                break;
+        }
+    }
+    FILE* target = stdin;
+    if (!path) {
+        printf("Untyped Lambda-Calculus Interpreter V0.1\n");
+        printf("By Junru Shen, Hohai University\n");
+        printf("Interactive Mode\n");
+        printf("> ");
+    } else {
+        target = fopen(path, "r");
+    }
+    store = NULL;
+    char ch;
+    bool skip = false;
+    while (fscanf(target, "%c", &ch) != EOF) {
+        if (skip) {
+            if (ch == '#') {
+                skip = false;
+            }
+            continue;
+        }
+        if (ch == L'\n') {
+            if (code_len >= 2 && code[code_len - 1] == L'\\') {
+                code_len--;
+            } else {
+                if (code_len == 0) {
+                    continue;
+                }
+                load_src(code, code_len);
+                struct ast_node* ast = e();
+                if (store != NULL) {
+                    struct symbol* sym = malloc(sizeof(struct symbol));
+                    sym->next = symbol_head;
+                    sym->node = dup_node(ast);
+                    sym->name = store;
+                    sym->len = store_len;
+                    symbol_head = sym;
+                    store = NULL;
+                    if (!path) {
+                        printf("Saved\n");
+                    }
+                } else {
+                    eval(ast);
+                    dump_ast(ast);
+                    printf("\n");
+                }
+                code_len = 0;
+                if (!path) {
+                    printf("> ");
+                }
+                continue;
+            }
+        } else if (ch == ':') {
+            store = malloc(code_len);
+            memcpy(store, code, code_len);
+            store_len = code_len;
+            code_len = 0;
+            continue;
+        } else if (ch == '#') {
+            skip = true;
+            continue;
+        }
+        code[code_len++] = ch;
+    }
 }
 
 void load_src(const char* src_code, size_t len) {
     src_p = src_beg = src_code;
     src_end = src_code + len;
+    token.type = look_ahead.type = EOF;
+    token.val = look_ahead.val = NULL;
     next();
 }
 
@@ -152,6 +238,13 @@ void next() {
     }
 }
 
+#define IS_STR_EQ(a, b, a_len, b_len) ((a_len) == (b_len) && !memcmp((void*) a, (void*) b, (a_len)))
+#define COPY_STR(dst, src, len) \
+do { \
+    dst = malloc((len)); \
+    memcpy(dst, src, (len)); \
+} while (0)
+
 #define EXPECT(t) \
 do { \
     next(); \
@@ -163,10 +256,20 @@ struct ast_node* e() {
     struct ast_node *node = NULL;
 
     switch (look_ahead.type) {
-        case T_VAR:
+        case T_VAR: {
             EXPECT(T_VAR);
+            struct symbol* p_sym = symbol_head;
+            while (p_sym != NULL) {
+                if (IS_STR_EQ(p_sym->name, token.val, p_sym->len, token.len)) {
+                    node = dup_node(p_sym->node);
+                    goto sym_lookup_done;
+                }
+                p_sym = p_sym->next;
+            }
             BUILD_VAR(node, token.val, token.len);
+            sym_lookup_done:
             break;
+        }
         case T_LAMBDA: {
             EXPECT(T_LAMBDA);
             EXPECT(T_VAR);
@@ -213,13 +316,6 @@ void dump_ast(struct ast_node* node) {
     }
 }
 
-#define IS_STR_EQ(a, b, a_len, b_len) ((a_len) == (b_len) && !memcmp((void*) a, (void*) b, (a_len)))
-#define COPY_STR(dst, src, len) \
-do { \
-    dst = malloc((len)); \
-    memcpy(dst, src, (len)); \
-} while (0)
-
 bool is_fv(struct ast_node* m, const char* name, size_t len) {
     bool eq = IS_STR_EQ(name, m->var_name, len, m->var_len);
 
@@ -247,7 +343,7 @@ struct ast_node* dup_node(struct ast_node* m) {
             break;
         case A_ABS: {
             COPY_STR(name, m->var_name, m->var_len);
-            BUILD_ABS(node, name, m->var_len, m->l);
+            BUILD_ABS(node, name, m->var_len, dup_node(m->l));
             break;
         }
     }
