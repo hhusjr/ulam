@@ -7,6 +7,7 @@ Untyped lambda calculus interpreter implemented by C
 g++ ulam.cpp -o ulam
 
 ./ulam -o <Source File Path>：解释指定源文件中的lambda演算表达式
+  
 ./ulam：进入交互模式
 
 # 语法
@@ -16,6 +17,6 @@ g++ ulam.cpp -o ulam
 使用严格的lambda表达式：Exp ::== (Exp Exp) | \T.Exp | T
 
 定义助记符号：
-<Symbol Name>:<Lambda Expr>
+\<Symbol Name\>:\<Lambda Expr\>
   
 （可以看ex.lamb示例文件）
