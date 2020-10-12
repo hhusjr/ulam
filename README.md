@@ -1,7 +1,7 @@
 # ulam
 Untyped lambda calculus interpreter implemented by C
 
-无类型lambda演算解释器C语言实现
+短小精悍的无类型lambda演算解释器C语言实现
 
 # 使用方法
 g++ ulam.cpp -o ulam
