@@ -6,7 +6,7 @@ Untyped lambda calculus interpreter implemented by C
 # 使用方法
 g++ ulam.cpp -o ulam
 
-./ulam -o <Source File Path>：解释指定源文件中的lambda演算表达式
+./ulam -o \<Source File Path\>：解释指定源文件中的lambda演算表达式
   
 ./ulam：进入交互模式
 
