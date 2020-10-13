@@ -9,12 +9,19 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <getopt.h>
+#include <errno.h>
 
 #define C_LAMBDA '\\'
 
 #define PARSE_ERROR(fmt, ...) \
 do {\
-    printf("Lambda: Parse error: "fmt"\n", __VA_ARGS__); \
+    printf("ulam: Parse error: "fmt"\n", __VA_ARGS__); \
+    abort(); \
+} while (0)
+
+#define RUNTIME_ERROR(fmt, ...) \
+do {\
+    printf("ulam: Runtime error: "fmt"\n", __VA_ARGS__); \
     abort(); \
 } while (0)
 
@@ -101,7 +108,7 @@ char* new_var_name(const char* name, size_t len, size_t* new_len);
 bool eval_single_step(struct ast_node* m);
 void eval(struct ast_node* m);
 
-#define CODE_BUFFER_SIZE 1024
+#define CODE_BUFFER_SIZE 10240
 char code[CODE_BUFFER_SIZE];
 size_t code_len = 0, store_len = 0;
 char* store;
@@ -114,6 +121,12 @@ struct symbol {
     struct symbol* next;
 };
 struct symbol* symbol_head = NULL;
+
+struct source_stack_node {
+    FILE* file;
+    struct source_stack_node* next;
+};
+struct source_stack_node* source_stack_top = NULL;
 
 int main(int argc, char** argv) {
     const char* path = NULL;
@@ -129,19 +142,27 @@ int main(int argc, char** argv) {
                 break;
         }
     }
-    FILE* target = stdin;
+    source_stack_top = malloc(sizeof(struct source_stack_node));
+    source_stack_top->next = NULL;
     if (!path) {
+        source_stack_top->file = stdin;
         printf("Untyped Lambda-Calculus Interpreter V0.1\n");
         printf("By Junru Shen, Hohai University\n");
         printf("Interactive Mode\n");
         printf("> ");
     } else {
-        target = fopen(path, "r");
+        source_stack_top->file = fopen(path, "r");
     }
     store = NULL;
     char ch;
     bool skip = false;
-    while (fscanf(target, "%c", &ch) != EOF) {
+    while (source_stack_top != NULL) {
+        if (fscanf(source_stack_top->file, "%c", &ch) == EOF) {
+            struct source_stack_node* tmp = source_stack_top;
+            source_stack_top = source_stack_top->next;
+            free(tmp);
+            continue;
+        }
         if (skip) {
             if (ch == '#') {
                 skip = false;
@@ -155,9 +176,9 @@ int main(int argc, char** argv) {
                 if (code_len == 0) {
                     continue;
                 }
-                load_src(code, code_len);
-                struct ast_node* ast = e();
-                if (store != NULL) {
+                if (store != NULL && store_len) {
+                    load_src(code, code_len);
+                    struct ast_node* ast = e();
                     struct symbol* sym = malloc(sizeof(struct symbol));
                     sym->next = symbol_head;
                     sym->node = dup_node(ast);
@@ -168,7 +189,21 @@ int main(int argc, char** argv) {
                     if (!path) {
                         printf("Saved\n");
                     }
+                } else if (store != NULL && !store_len) {
+                    struct source_stack_node* tmp = source_stack_top;
+                    source_stack_top = malloc(sizeof(struct source_stack_node));
+                    source_stack_top->next = tmp;
+                    code[code_len] = '\0';
+                    source_stack_top->file = fopen(code, "r");
+                    if (errno) {
+                        RUNTIME_ERROR("Error while loading external library %s: %s", code, strerror(errno));
+                    }
+                    if (!path) {
+                        printf("Load external library %s OK\n", code);
+                    }
                 } else {
+                    load_src(code, code_len);
+                    struct ast_node* ast = e();
                     eval(ast);
                     dump_ast(ast);
                     printf("\n");

@@ -1,20 +1,5 @@
 # 布尔值定义 #
-TRUE:\a.\b.a
-FALSE:\a.\b.b
-
-# 数字定义（邱奇数） #
-ZERO:\f.\x.x
-ISZERO:\n.((n \x.FALSE) TRUE)
-SUCC:\g.\f.\x.(f ((g f) x))
-
-# 数字运算定义 #
-PLUS:\g.\h.((g SUCC) h)
-
-# 逻辑运算符 #
-AND:\x.\y.((x y) x)
-OR:\x.\y.((x x) y)
-NOT:\p.((p FALSE) TRUE)
-IFTHENELSE:\p.\a.\b.((p a) b)
+:../lib.lamb
 
 # 测试 #
 (((IFTHENELSE ((OR TRUE) FALSE)) y) x)
