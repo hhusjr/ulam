@@ -1,0 +1,33 @@
+# ulam standard library #
+# By Junru Shen, Hohai University #
+
+# Boolean values #
+true:  \a.\b.a
+false: \a.\b.b
+
+# Number values #
+->: \g.\f.\x.(f ((g f) x))
+<-: \n.\f.\x.(((n \g.\h.(h (g f))) \u.x) \u.u)
+
+# Numeric operators #
++: \g.\h.((h ->) g)
+-: \g.\h.((h <-) g)
+*: \g.\h.((h (+ g)) $i0)
+^: \g.\h.((h (* g)) $i1)
+
+# Logical operators #
+&: \x.\y.((x y) x)
+|: \x.\y.((x x) y)
+!: \p.((p false) true)
+
+# Predicates #
+empty: \n.((n \x.false) true)
+
+# Statements #
+if: \p.\a.\b.((p a) b)
+
+# Y fixed point combinator #
+Y: \f.(\x.(f (x x)) \x.(f (x x)))
+
+# Math functions #
+fact: \f.\x.(((if (empty x)) $i1) ((* x) (f (<- x))))

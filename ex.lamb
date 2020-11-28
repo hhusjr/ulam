@@ -1,10 +1,8 @@
-# 布尔值定义 #
-:../lib.lamb
-
-# 测试 #
-(((IFTHENELSE ((OR TRUE) FALSE)) y) x)
-ONE:(SUCC ZERO)
-TWO:(SUCC (SUCC ZERO))
-THREE:(SUCC (SUCC (SUCC ZERO)))
-((PLUS ((PLUS ONE) TWO)) THREE)
-(ISZERO ONE)
+# 引入std.lamb标准库（路径可能不一样，自己修改下） #
+:../std.lamb
+# 写出高阶的阶乘递归函数 #
+factorial: \f.\x.(((if (empty x)) $i1) ((* x) (f (<- x))))
+# 传入Y不动点组合子，写出阶乘函数 #
+factorial_calc: \x.((factorial (Y factorial)) x)
+# 计算一个阶乘5!试试看，以邱奇数的模式输出 #
+$i:(factorial_calc $i5)

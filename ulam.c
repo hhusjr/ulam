@@ -106,7 +106,11 @@ void sub(struct ast_node* m, struct ast_node* n, const char* name, size_t len);
 struct ast_node* dup_node(struct ast_node* m);
 char* new_var_name(const char* name, size_t len, size_t* new_len);
 bool eval_single_step(struct ast_node* m);
-void eval(struct ast_node* m);
+void eval(struct ast_node *m, bool show_steps);
+
+struct ast_node* from_int(int val);
+int to_int(struct ast_node* m);
+bool to_bool(struct ast_node* m);
 
 #define CODE_BUFFER_SIZE 10240
 char code[CODE_BUFFER_SIZE];
@@ -127,6 +131,8 @@ struct source_stack_node {
     struct source_stack_node* next;
 };
 struct source_stack_node* source_stack_top = NULL;
+
+int ulam_atoi(const char* str, size_t len);
 
 int main(int argc, char** argv) {
     const char* path = NULL;
@@ -179,15 +185,38 @@ int main(int argc, char** argv) {
                 if (store != NULL && store_len) {
                     load_src(code, code_len);
                     struct ast_node* ast = e();
-                    struct symbol* sym = malloc(sizeof(struct symbol));
-                    sym->next = symbol_head;
-                    sym->node = dup_node(ast);
-                    sym->name = store;
-                    sym->len = store_len;
-                    symbol_head = sym;
-                    store = NULL;
-                    if (!path) {
-                        printf("Saved\n");
+                    if (store[0] != '$') {
+                        struct symbol *sym = malloc(sizeof(struct symbol));
+                        sym->next = symbol_head;
+                        sym->node = dup_node(ast);
+                        sym->name = store;
+                        sym->len = store_len;
+                        symbol_head = sym;
+                        if (!path) {
+                            printf("Saved %.*s\n", (int) store_len, store);
+                        }
+                    } else {
+                        switch (store[1]) {
+                            case 'i':
+                                // Integer output
+                                eval(ast, false);
+                                printf("%d\n", to_int(ast));
+                                break;
+
+                            case 'b':
+                                // Boolean output
+                                eval(ast, false);
+                                printf(to_bool(ast) ? "TRUE" : "FALSE");
+                                break;
+
+                            case 's':
+                                // Output reduction steps
+                                eval(ast, true);
+                                break;
+
+                            default:
+                                PARSE_ERROR("Unexpected display modifier: $%c", store[1]);
+                        }
                     }
                 } else if (store != NULL && !store_len) {
                     struct source_stack_node* tmp = source_stack_top;
@@ -201,13 +230,14 @@ int main(int argc, char** argv) {
                     if (!path) {
                         printf("Load external library %s OK\n", code);
                     }
-                } else {
+                } else if (store == NULL) {
                     load_src(code, code_len);
                     struct ast_node* ast = e();
-                    eval(ast);
+                    eval(ast, false);
                     dump_ast(ast);
                     printf("\n");
                 }
+                store = NULL;
                 code_len = 0;
                 if (!path) {
                     printf("> ");
@@ -293,6 +323,18 @@ struct ast_node* e() {
     switch (look_ahead.type) {
         case T_VAR: {
             EXPECT(T_VAR);
+            if (token.val[0] == '$') {
+                switch (token.val[1]) {
+                    case 'i': {
+                        int val = ulam_atoi(token.val + 2, token.len - 2);
+                        node = from_int(val);
+                        goto sym_lookup_done;
+                    }
+
+                    default:
+                        RUNTIME_ERROR("Wrong variable modifier", NULL);
+                }
+            }
             struct symbol* p_sym = symbol_head;
             while (p_sym != NULL) {
                 if (IS_STR_EQ(p_sym->name, token.val, p_sym->len, token.len)) {
@@ -463,6 +505,62 @@ bool eval_single_step(struct ast_node* m) {
     }
 }
 
-void eval(struct ast_node* m) {
-    while (eval_single_step(m));
+void eval(struct ast_node *m, bool show_steps) {
+    if (show_steps) {
+        printf("\n-> ");
+        dump_ast(m);
+    }
+    while (eval_single_step(m)) {
+        if (show_steps) {
+            printf("\n-> ");
+            dump_ast(m);
+        }
+    }
+    if (show_steps) {
+        printf("\n");
+    }
+}
+
+int to_int(struct ast_node* m) {
+    switch (m->type) {
+        case A_APP:
+            return to_int(m->r) + 1;
+
+        case A_ABS:
+            return to_int(m->l);
+
+        case A_VAR:
+            return 0;
+    }
+}
+
+bool to_bool(struct ast_node* m) {
+    return true;
+}
+
+int ulam_atoi(const char* str, size_t len) {
+    int result = 0;
+    for (int i = 0; i < len; i++) {
+        result = 10 * result + str[i] - '0';
+    }
+    return result;
+}
+
+struct ast_node* from_int_app_(int val) {
+    struct ast_node* node;
+    if (!val) {
+        BUILD_VAR(node, "x", 1);
+        return node;
+    }
+    struct ast_node* var;
+    BUILD_VAR(var, "f", 1);
+    BUILD_APP(node, var, from_int_app_(val - 1));
+    return node;
+}
+
+struct ast_node* from_int(int val) {
+    struct ast_node *f, *x;
+    BUILD_ABS(x, "x", 1, from_int_app_(val));
+    BUILD_ABS(f, "f", 1, x);
+    return f;
 }
