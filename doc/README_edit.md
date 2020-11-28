@@ -21,16 +21,16 @@ $\lambda-calculus$，又称$\lambda$演算，是一套研究函数定义、应�
 
 支持标准的$\lambda-calculus$文法。使用$BNF$文法描述为：
 $$
-Term\rarr T \\
-Term\rarr (Term\ Term) \\
-Term\rarr(\backslash T.Term)
+Term\rightarrow T \\
+Term\rightarrow (Term\ Term) \\
+Term\rightarrow(\backslash T.Term)
 $$
 其中T是一个由不包含括号字符、空字符、反斜杠\、点.的任意字符构成的终结符。为了便于查看结果和便于计算，ulam还支持一些扩展语法。下面会提到。
 
 ### 助记符定义
 
 $$
-Mnemonic\rarr T:Term
+Mnemonic\rightarrow T:Term
 $$
 
 其中$T$不能由美元符号$\$$开头。可以把一些$\lambda$ Term定义为一个助记符（Mnemonic）。可以在定义之后直接引用。
@@ -40,7 +40,7 @@ ulam还包含一些预定义（Pre-defined）助记符。目前支持生成邱�
 ### 引入其他文件
 
 $$
-FileImport\rarr :FilePath
+FileImport\rightarrow :FilePath
 $$
 
 冒号后面直接写路径即可。
@@ -49,7 +49,7 @@ $$
 
 助记符不会产生输出。默认情况下，Term会输出化简到最简化形式的Lambda Term。对于一些特殊的Lambda Term，可以定义输出模式：
 $$
-ModDefinedTerm\rarr $\ Modifier:Term
+ModDefinedTerm\rightarrow $\ Modifier:Term
 $$
 其中，Modifier目前支持
 
@@ -65,7 +65,7 @@ $$
 
 首先定义
 
-+ $(\backslash x.M N)\rarr M[N/x]$为$Beta$步骤。
++ $(\backslash x.M N)\rightarrow M[N/x]$为$Beta$步骤。
 + $\frac{N->N'}{(M N)->(M N')}$为$Mu$步骤。
 + $\frac{M->M'}{(M N)->(M' N)}$为$Nu$步骤。
 
@@ -164,7 +164,7 @@ $$
 Y: \f.(\x.(f (x x)) \x.(f (x x)))
 ```
 
-计算一下就可以发现，$(Y\ g)=(g\ (Y\ g))$。这里的Y是理论计算机科学家，Haskell的发明者Curry发现的一个Lambda Term，被称为Y不动点组合子。而这个组合子恰好满足刚才的方程$f=(factorial f)$。只需要取
+计算一下就可以发现，$(Y\ g)=(g\ (Y\ g))$。这里的Y是数理逻辑学家Curry Haskell发现的一个Lambda Term，被称为Y不动点组合子。而这个组合子恰好满足刚才的方程$f=(factorial f)$。只需要取
 $$
 f=(Y factorial)
 $$
