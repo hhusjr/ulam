@@ -104,7 +104,6 @@ struct ast_node* parse_atom();
 void dump_ast(struct ast_node* node);
 
 bool is_fv(struct ast_node* m, const char* name, size_t len);
-void del(struct ast_node* m);
 void sub(struct ast_node* m, struct ast_node* n, const char* name, size_t len);
 struct ast_node* dup_node(struct ast_node* m);
 char* new_var_name(const char* name, size_t len, size_t* new_len);
@@ -137,7 +136,6 @@ struct source_stack_node* source_stack_top = NULL;
 
 int ulam_atoi(const char* str, size_t len);
 
-/*
 int main(int argc, char** argv) {
     const char* path = NULL;
     int result;
@@ -188,7 +186,7 @@ int main(int argc, char** argv) {
                 }
                 if (store != NULL && store_len) {
                     load_src(code, code_len);
-                    struct ast_node* ast = e();
+                    struct ast_node* ast = parse_term();
                     if (store[0] != '$') {
                         struct symbol *sym = malloc(sizeof(struct symbol));
                         sym->next = symbol_head;
@@ -236,7 +234,7 @@ int main(int argc, char** argv) {
                     }
                 } else if (store == NULL) {
                     load_src(code, code_len);
-                    struct ast_node* ast = e();
+                    struct ast_node* ast = parse_term();
                     eval(ast, false);
                     dump_ast(ast);
                     printf("\n");
@@ -260,12 +258,6 @@ int main(int argc, char** argv) {
         }
         code[code_len++] = ch;
     }
-}
- */
-int main() {
-    const char* s = "+ (a b c) b";
-    load_src(s, strlen(s));
-    dump_ast(parse_term(s));
 }
 
 void load_src(const char* src_code, size_t len) {
@@ -375,7 +367,25 @@ struct ast_node* parse_atom() {
         // atom ::== VAR
         case T_VAR: {
             EXPECT(T_VAR);
-            struct ast_node *node = NULL;
+            if (token.val[0] == '$') {
+                switch (token.val[1]) {
+                    case 'i': {
+                        int val = ulam_atoi(token.val + 2, token.len - 2);
+                        return from_int(val);
+                    }
+
+                    default:
+                        RUNTIME_ERROR("Wrong variable modifier", NULL);
+                }
+            }
+            struct symbol* p_sym = symbol_head;
+            while (p_sym != NULL) {
+                if (IS_STR_EQ(p_sym->name, token.val, p_sym->len, token.len)) {
+                    return dup_node(p_sym->node);
+                }
+                p_sym = p_sym->next;
+            }
+            struct ast_node* node;
             BUILD_VAR(node, token.val, token.len);
             return node;
         }

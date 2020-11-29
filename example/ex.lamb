@@ -1,8 +1,8 @@
 # 引入std.lamb标准库（路径可能不一样，自己修改下） #
-:../std.lamb
+:../lib/std.lamb
 # 写出高阶的阶乘递归函数 #
-factorial: \f.\x.(((if (empty x)) $i1) ((* x) (f (<- x))))
+factorial: \f.\x.if (empty x) $i1 (* x (f (<- x)))
 # 传入Y不动点组合子，写出阶乘函数 #
-factorial_calc: \x.((factorial (Y factorial)) x)
+factorial_calc: \x.factorial (Y factorial) x
 # 计算一个阶乘5!试试看，以邱奇数的模式输出 #
-$i:(factorial_calc $i5)
+$i:factorial_calc $i5
