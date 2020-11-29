@@ -83,7 +83,7 @@ ulam默认使用懒求值策略。
 ## 使用方法
 
 ```shell
-g++ ulam.cpp -o ulam # 使用其它编译器也可以
+g++ ulam.c -o ulam # 使用其它编译器也可以
 ./ulam -o <Source File Path> #解释指定源文件中的lambda演算表达式
 ./ulam #进入交互模式
 ```
