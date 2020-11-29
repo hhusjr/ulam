@@ -97,7 +97,10 @@ const char *src_p = NULL, *src_beg = NULL, *src_end = NULL;
 
 void load_src();
 void next();
-struct ast_node* e();
+struct ast_node* parse_term();
+struct ast_node* parse_application_term();
+struct ast_node* parse_application_term_extra(struct ast_node* last);
+struct ast_node* parse_atom();
 void dump_ast(struct ast_node* node);
 
 bool is_fv(struct ast_node* m, const char* name, size_t len);
@@ -134,6 +137,7 @@ struct source_stack_node* source_stack_top = NULL;
 
 int ulam_atoi(const char* str, size_t len);
 
+/*
 int main(int argc, char** argv) {
     const char* path = NULL;
     int result;
@@ -257,6 +261,12 @@ int main(int argc, char** argv) {
         code[code_len++] = ch;
     }
 }
+ */
+int main() {
+    const char* s = "+ (a b c) b";
+    load_src(s, strlen(s));
+    dump_ast(parse_term(s));
+}
 
 void load_src(const char* src_code, size_t len) {
     src_p = src_beg = src_code;
@@ -310,6 +320,9 @@ do { \
     memcpy(dst, src, (len)); \
 } while (0)
 
+/*
+ * Parsing
+ */
 #define EXPECT(t) \
 do { \
     next(); \
@@ -317,62 +330,93 @@ do { \
         PARSE_ERROR("Expected %s, got %s", str_token_t[t], str_token_t[token.type]); \
     } \
 } while (0)
-struct ast_node* e() {
-    struct ast_node *node = NULL;
-
+// term
+struct ast_node* parse_term() {
     switch (look_ahead.type) {
-        case T_VAR: {
-            EXPECT(T_VAR);
-            if (token.val[0] == '$') {
-                switch (token.val[1]) {
-                    case 'i': {
-                        int val = ulam_atoi(token.val + 2, token.len - 2);
-                        node = from_int(val);
-                        goto sym_lookup_done;
-                    }
+        // term ::== applicationTerm
+        case T_VAR:
+        case T_LPAR:
+            return parse_application_term();
 
-                    default:
-                        RUNTIME_ERROR("Wrong variable modifier", NULL);
-                }
-            }
-            struct symbol* p_sym = symbol_head;
-            while (p_sym != NULL) {
-                if (IS_STR_EQ(p_sym->name, token.val, p_sym->len, token.len)) {
-                    node = dup_node(p_sym->node);
-                    goto sym_lookup_done;
-                }
-                p_sym = p_sym->next;
-            }
-            BUILD_VAR(node, token.val, token.len);
-            sym_lookup_done:
-            break;
-        }
+        // term ::== LAMBDA VAR DOT term
         case T_LAMBDA: {
             EXPECT(T_LAMBDA);
             EXPECT(T_VAR);
             struct token tmp = token;
             EXPECT(T_DOT);
-            BUILD_ABS(node, tmp.val, tmp.len, e());
-            break;
+            struct ast_node *node = NULL;
+            BUILD_ABS(node, tmp.val, tmp.len, parse_term());
+            return node;
         }
-        case T_LPAR:
-            EXPECT(T_LPAR);
-            BUILD_APP(node, e(), e());
-            EXPECT(T_RPAR);
-            break;
-        case T_DOT:
-            PARSE_ERROR("Unexpected token .", NULL);
-            break;
-        case T_RPAR:
-            PARSE_ERROR("Unexpected token )", NULL);
-            break;
-        case T_UEOF:
-            PARSE_ERROR("Unexpected token EOF", NULL);
-            break;
-    }
 
-    return node;
+        // other: fail
+        default:
+            PARSE_ERROR("Unexpected token %s, expected %s, %s or %s",
+                    str_token_t[look_ahead.type], str_token_t[T_VAR], str_token_t[T_LPAR], str_token_t[T_LAMBDA]);
+    }
 }
+// applicationTerm
+struct ast_node* parse_application_term() {
+    switch (look_ahead.type) {
+        // applicationTerm ::== atom applicationTermExtra
+        case T_VAR:
+        case T_LPAR:
+            return parse_application_term_extra(parse_atom());
+
+        // other: fail
+        default:
+            PARSE_ERROR("Unexpected token %s, expected %s or %s",
+                        str_token_t[look_ahead.type], str_token_t[T_VAR], str_token_t[T_LPAR]);
+    }
+}
+// atom
+struct ast_node* parse_atom() {
+    switch (look_ahead.type) {
+        // atom ::== VAR
+        case T_VAR: {
+            EXPECT(T_VAR);
+            struct ast_node *node = NULL;
+            BUILD_VAR(node, token.val, token.len);
+            return node;
+        }
+
+        // atom ::== ( term )
+        case T_LPAR: {
+            EXPECT(T_LPAR);
+            struct ast_node* term = parse_term();
+            EXPECT(T_RPAR);
+            return term;
+        }
+
+        // other: fail
+        default:
+            PARSE_ERROR("Unexpected token %s, expected %s or %s",
+                        str_token_t[look_ahead.type], str_token_t[T_VAR], str_token_t[T_LPAR]);
+    }
+}
+// applicationTermExtra
+struct ast_node* parse_application_term_extra(struct ast_node* last) {
+    switch (look_ahead.type) {
+        // applicationTermExtra ::== epsilon
+        case T_RPAR:
+        case T_UEOF:
+            return last;
+
+        // applicationTermExtra ::== atom applicationTermExtra
+        case T_LPAR:
+        case T_VAR: {
+            struct ast_node* node = NULL;
+            BUILD_APP(node, last, parse_atom());
+            return parse_application_term_extra(node);
+        }
+
+        // other: fail
+        default:
+            PARSE_ERROR("Unexpected token %s, expected %s or %s or %s",
+                        str_token_t[look_ahead.type], str_token_t[T_VAR], str_token_t[T_LPAR], str_token_t[T_RPAR]);
+    }
+}
+
 void dump_ast(struct ast_node* node) {
     switch (node->type) {
         case A_ABS:
